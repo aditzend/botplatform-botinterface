@@ -1,12 +1,12 @@
-import { botMessageProcessor, BotEvent } from 'App/utils/botMessageProcessor'
 import Logger from '@ioc:Adonis/Core/Logger'
-import Env from '@ioc:Adonis/Core/Env'
-import { RasaResponse, RasaNode, postRasaMessage } from 'App/utils/postRasaMessage'
-import transformRasaEvent from './transformRasaEvent'
-import { Node, ConversationNode } from './node'
-
+import { postRasaMessage } from 'App/utils/postRasaMessage'
+import { getContext, EventContext } from './getContext'
 const logger = Logger.child({ module: 'callBot' })
 
+type BotEvent = {
+  message: string
+  event_name: string
+}
 export type CallBotPayload = {
   sender: string
   bot_name: string
@@ -19,12 +19,13 @@ export type CallBotPayload = {
 export type RasaPayload = {
   sender: string
   message: string
-  bot_name?: string
+  bot_name: string
 }
 
-export type CallBotResponse = {
+type CallBotResponse = {
   recipient_id: string
   bot_name: string
+  context: EventContext
   channel?: string
   parameters?: string[]
   events?: BotEvent[]
@@ -47,6 +48,17 @@ export async function callBot({
     let recursiveMessage: string = message
     let command: string = ''
     let cutCondition: boolean = false
+    let context: EventContext = {
+      slots: {},
+      intent: {
+        name: '',
+        confidence: 0,
+      },
+      entities: [],
+      rasa_message_id: '',
+      rasa_message_timestamp: '',
+      action_name: '',
+    }
     while (!cutCondition) {
       logger.debug({ events }, 'Events')
       const rasaPayload: RasaPayload = {
@@ -55,6 +67,9 @@ export async function callBot({
         bot_name,
       }
       const rasaResponses = await postRasaMessage(rasaPayload)
+      if (recursiveMessage === message) {
+        context = await getContext(rasaPayload)
+      }
 
       // Check that there actually are events present
       if (rasaResponses.length < 1) {
@@ -111,6 +126,7 @@ export async function callBot({
       channel,
       parameters,
       events,
+      context,
     }
     logger.info({ processedResponse }, 'Processed response')
     return processedResponse

@@ -29,8 +29,7 @@ export type RasaNode = {
 }
 
 export async function postRasaMessage(payload: RasaPayload): Promise<RasaResponse[]> {
-  const { bot_name } = payload
-  const url = await getBotHost(bot_name)
+  const url = await getBotHost(payload.bot_name)
   const res = await axios.post(`${url}/webhooks/rest/webhook`, payload)
   return res.data
 }
