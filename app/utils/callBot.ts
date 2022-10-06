@@ -23,7 +23,7 @@ export type RasaPayload = {
 }
 
 export type CallBotResponse = {
-  sender: string
+  recipient_id: string
   bot_name: string
   channel?: string
   parameters?: string[]
@@ -43,30 +43,11 @@ export async function callBot({
   parameters,
 }: CallBotPayload): Promise<CallBotResponse> {
   try {
-    // Build the conversation Graph starting with the sender's message
-    const conversation: Node = {
-      sender,
-      message,
-      bot_name,
-    }
-
     const events: BotEvent[] = []
-
-    // Iterate through the conversation graph
-    // with currentNode pointing to the current node
-    let currentNode = conversation
-
-    // The actual message to be sent to Rasa
-    // will be modified on each node
     let recursiveMessage: string = message
     let command: string = ''
-
     let cutCondition: boolean = false
-
-    logger.debug({ currentNode }, 'Current node')
-
     while (!cutCondition) {
-      logger.debug({ conversation }, 'Conversation')
       logger.debug({ events }, 'Events')
       const rasaPayload: RasaPayload = {
         sender,
@@ -83,27 +64,30 @@ export async function callBot({
 
       for (const event of rasaResponses) {
         logger.debug({ event }, 'Rasa event added as child')
-        // Add the event to the conversation graph
-        currentNode.child = {
-          sender,
-          message: event.text,
-          bot_name,
-        }
-
-        // Move down the conversation graph
-        currentNode = currentNode.child
-
         if (event.text.includes('>>>')) {
           ;[command, recursiveMessage] = event.text.split('>>>')
+          if (command === 'show_message_then_transfer') {
+            events.push({
+              message: recursiveMessage,
+              event_name: '*text',
+            })
+            events.push({
+              message: '',
+              event_name: '*transfer',
+            })
+          }
+          if (command === 'show_message_then_close') {
+            events.push({
+              message: recursiveMessage,
+              event_name: '*text',
+            })
+            events.push({
+              message: '',
+              event_name: '*offline',
+            })
+          }
+
           logger.debug({ command, recursiveMessage }, 'Command and recursive message')
-          // if (command === 'echo') {
-          //   currentNode.child = {
-          //     sender,
-          //     message: recursiveMessage,
-          //     bot_name,
-          //   }
-          //   currentNode = currentNode.child
-          // }
         } else {
           events.push({
             message: event.text,
@@ -120,15 +104,15 @@ export async function callBot({
       }
     }
 
-    logger.info({ conversation }, 'Conversation graph')
-    logger.info({ events }, 'Events')
+    // logger.info({ conversation }, 'Conversation graph')
     const processedResponse: CallBotResponse = {
-      sender,
+      recipient_id: sender,
       bot_name,
       channel,
       parameters,
-      events: [],
+      events,
     }
+    logger.info({ processedResponse }, 'Processed response')
     return processedResponse
   } catch (error) {
     Logger.error(error)
