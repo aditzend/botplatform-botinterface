@@ -4,8 +4,8 @@ import transformRasaEvent from './transformRasaEvent'
 const logger = Logger.child({ module: 'botMessageProcessor' })
 
 export type BotEvent = {
-  Message: string
-  EventName: string
+  message: string
+  event_name: string
 }
 
 export async function botMessageProcessor({
