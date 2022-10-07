@@ -2,8 +2,6 @@ import { RasaPayload } from 'App/utils/callBot'
 import getBotHost from './getBotHost'
 import axios from 'axios'
 import _ from 'lodash'
-import Logger from '@ioc:Adonis/Core/Logger'
-const logger = Logger.child({ module: 'getContext' })
 
 export type EventContext = {
   slots: object
@@ -22,7 +20,6 @@ export async function getContext(payload: RasaPayload): Promise<EventContext> {
   const tracker = await axios.get(`${url}/conversations/${payload.sender}/tracker`)
   const { data } = tracker
   const slots = _.pickBy(data.slots, _.isNotNull)
-  logger.fatal({ slots }, 'Tracker')
 
   const intent = {
     name: data.latest_message.intent.name,

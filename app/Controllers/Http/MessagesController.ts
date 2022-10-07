@@ -4,7 +4,16 @@ import { callBot, CallBotPayload } from 'App/utils/callBot'
 
 export default class MessagesController {
   public async index({ request }: HttpContextContract) {
-    const body = request.only(['sender', 'bot_name', 'message', 'channel', 'parameters'])
+    const body = request.only([
+      'sender',
+      'bot_name',
+      'message',
+      'channel',
+      'parameters',
+      'analyze',
+      'load_parameters',
+      'get_context',
+    ])
     const payload: CallBotPayload = body
     try {
       const botResponse = await callBot(payload)

@@ -1,0 +1,7 @@
+{
+  "vhosts": {
+    "v1": {
+      "connection": "amqp://guest:guest@192.168.43.169:5672/v1?heartbeat=10"
+    }
+  }
+}

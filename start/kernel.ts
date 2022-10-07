@@ -10,7 +10,8 @@
 */
 
 import Server from '@ioc:Adonis/Core/Server'
-
+import Logger from '@ioc:Adonis/Core/Logger'
+const logger = Logger.child({ module: 'kernel' })
 /*
 |--------------------------------------------------------------------------
 | Global middleware
@@ -39,3 +40,7 @@ Server.middleware.register([() => import('@ioc:Adonis/Core/BodyParser')])
 |
 */
 Server.middleware.registerNamed({})
+logger.info(`Environment loaded: ${process.env.ENV_NAME} `)
+logger.info(`Log level: ${process.env.LOG_LEVEL} `)
+const version = '1.2.0'
+logger.info(`Version: ${version}`)

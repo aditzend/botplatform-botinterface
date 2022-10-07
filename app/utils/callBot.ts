@@ -1,6 +1,8 @@
 import Logger from '@ioc:Adonis/Core/Logger'
 import { postRasaMessage } from 'App/utils/postRasaMessage'
+import { sendRabbitMQ } from './rabbit'
 import { getContext, EventContext } from './getContext'
+import { loadOutgoingTaskParameter } from './loadParameters'
 const logger = Logger.child({ module: 'callBot' })
 
 type BotEvent = {
@@ -13,6 +15,9 @@ export type CallBotPayload = {
   message: string
   channel?: string
   parameters?: string[]
+  analyze?: boolean
+  load_parameters?: boolean
+  get_context?: boolean
 }
 
 // Se respeta el formato de la consulta de Rasa
@@ -22,13 +27,15 @@ export type RasaPayload = {
   bot_name: string
 }
 
-type CallBotResponse = {
+export type CallBotResponse = {
   recipient_id: string
   bot_name: string
-  context: EventContext
+  context?: EventContext
   channel?: string
   parameters?: string[]
   events?: BotEvent[]
+  analyze: boolean
+  load_parameters: boolean
 }
 
 /**
@@ -42,25 +49,18 @@ export async function callBot({
   message,
   channel,
   parameters,
+  analyze,
+  load_parameters,
+  get_context,
 }: CallBotPayload): Promise<CallBotResponse> {
   try {
     const events: BotEvent[] = []
     let recursiveMessage: string = message
     let command: string = ''
     let cutCondition: boolean = false
-    let context: EventContext = {
-      slots: {},
-      intent: {
-        name: '',
-        confidence: 0,
-      },
-      entities: [],
-      rasa_message_id: '',
-      rasa_message_timestamp: '',
-      action_name: '',
-    }
+    let context
     while (!cutCondition) {
-      logger.debug({ events }, 'Events')
+      logger.trace({ events }, 'Events')
       const rasaPayload: RasaPayload = {
         sender,
         message: recursiveMessage,
@@ -78,7 +78,6 @@ export async function callBot({
       }
 
       for (const event of rasaResponses) {
-        logger.debug({ event }, 'Rasa event added as child')
         if (event.text.includes('>>>')) {
           ;[command, recursiveMessage] = event.text.split('>>>')
           if (command === 'show_message_then_transfer') {
@@ -101,8 +100,6 @@ export async function callBot({
               event_name: '*offline',
             })
           }
-
-          logger.debug({ command, recursiveMessage }, 'Command and recursive message')
         } else {
           events.push({
             message: event.text,
@@ -114,24 +111,55 @@ export async function callBot({
       const lastMessage = rasaResponses[rasaResponses.length - 1].text
       const lastMessageHasEcho = lastMessage.includes('echo')
       if (!lastMessageHasEcho) {
-        logger.debug({ lastMessage }, 'Last message does not have echo')
         cutCondition = true
       }
     }
 
-    // logger.info({ conversation }, 'Conversation graph')
     const processedResponse: CallBotResponse = {
       recipient_id: sender,
       bot_name,
       channel,
       parameters,
       events,
-      context,
+      context: get_context ? context : 'NOT REQUESTED',
+      analyze: analyze ? true : false,
+      load_parameters: load_parameters ? true : false,
     }
-    logger.info({ processedResponse }, 'Processed response')
+    if (analyze)
+      sendRabbitMQ({
+        queueName: `${bot_name}_etl`,
+        data: {
+          interaction_id: sender,
+          bot_name,
+          message,
+          events,
+          context,
+          parameters,
+          channel,
+          component: 'botinterface',
+          sentAt: new Date().toISOString(),
+        },
+      })
+    if (load_parameters) {
+      const taskId = context.slots['idTarea'] || '812'
+      const prefix = process.env.OUTGOING_TASK_PARAM_PREFIX || 'pts_'
+      // Filter the slots that start with 'pts_'
+      const outgoingSlotKeys = Object.keys(context.slots).filter((slot) => slot.startsWith(prefix))
+      // Log the value of the slots that start with 'pts_'
+      outgoingSlotKeys.forEach((slot) => {
+        logger.info({ taskId, slot, value: context.slots[slot] }, 'Outgoing slot')
+        loadOutgoingTaskParameter({
+          taskId,
+          parameterName: slot,
+          parameterValue: context.slots[slot],
+        })
+      })
+    }
+
+    logger.trace({ processedResponse }, 'Processed response')
     return processedResponse
   } catch (error) {
-    Logger.error(error)
+    logger.error(error)
     return error
   }
 }
