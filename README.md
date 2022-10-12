@@ -1,3 +1,34 @@
+# botinterface
+Interfaz de conexión a apis de RASA
+
+## Hacer un llamado
+
+`http://[ip]:[puerto]/v1/messages`
+
+POST
+
+Body:
+```
+{
+  sender: string
+  message: string
+  channel: string
+  bot_name: string
+  load_parameters: boolean
+  get_context: boolean
+  analyze: boolean
+}
+```
+
+`sender` Identifica al interlocutor, generalmente es igual al id de interacción.
+
+`message` Uteración, acepta intenciones (las que empiezan con /)
+`channel` Para ajustar la respuesta al canal. Opciones válidas: WEB, SMS, WHATSAPP, FACEBOOK, INSTAGRAM, TWITTER, PHONE, VOICE
+`bot_name` Nombre del stack al que desea llamar
+`load_parameters` Si es verdadero se cargan los slots del bot que empiezan con 'pts_' como parámetros de salida de la tarea. Solo funciona para campañas salientes porque sino no hay idTarea donde cargarlos.
+`get_context` Si es verdadero devuelve toda la información de contexto de RASA.
+`analyze` Si es verdadero el mensaje se sube a la cola de trabajo de analytics. No importa si get_context es falso, el contexto se sube por detrás a la cola de RabbitMQ.
+
 # Versiones
 1.1.0 : Devuelve contexto en cada interacción
 1.2.0: Opciones get_context, analyze y load_parameters
@@ -22,3 +53,4 @@ RABBITMQ_HOST: Cola de tareas para analytics || amqp://192.168.43.169:5672/
 DBINTERFACE_URL: API de la base || http://192.168.43.169:30040
 OUTGOING_TASK_PARAM_PREFIX: Prefijo de los slots que se suben como parámetros de tarea de salida || pts_
 ```
+
